@@ -4,6 +4,7 @@ import av
 import logging
 import os
 import tempfile
+
 # Set the environment variable
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 logging.basicConfig(level=logging.WARNING)
@@ -21,6 +22,12 @@ from streamlit_webrtc import (
 )
 import supervision as sv
 import numpy as np
+import pygame
+from pygame import mixer
+import time
+
+# Initialize pygame mixer
+mixer.init()
 
 
 # Define the zone polygon
@@ -85,7 +92,7 @@ zone_annotator = sv.PolygonZoneAnnotator(
 #
 #     return frame
 
-def draw_annotations(frame, boxes, masks, names, frame_number):
+def draw_annotations(frame, boxes, masks, names):
     for box, name in zip(boxes, names):
         color = (0, 255, 0)  # Green color for bounding boxes
 
@@ -94,7 +101,7 @@ def draw_annotations(frame, boxes, masks, names, frame_number):
 
         # Check if masks are available
         if masks is not None:
-            mask = masks[frame_number]
+            mask = masks[frame]
             alpha = 0.3  # Transparency of masks
 
             # Draw mask
@@ -113,7 +120,8 @@ def main():
     st.title("Fire & Smoke Detection")
     st.subheader("The combination of YOLOv8 & Streamlit")
     st.sidebar.title("Select an option ⤵️")
-    choice = st.sidebar.radio("", ("Live Webcam Predict", "Capture Image And Predict",":rainbow[Multiple Images Upload -]🖼️🖼️🖼️", "Upload Video"),
+    #choice = st.sidebar.radio("", ("Live Webcam Predict", "Capture Image And Predict",":rainbow[Multiple Images Upload -]🖼️🖼️🖼️", "Upload Video"),
+    choice = st.sidebar.radio("", ("Live Webcam Predict", "Capture Image And Predict", ":rainbow[Multiple Images Upload -]🖼️🖼️🖼️"),
                             captions = ["Live count in zone. :red[(Slow Speed)]🐌", "Click and detect. :green[(Super Fast Speed)]⚡⚡", "Upload & Process Multiple Images. :blue[(Fast Speed)]⚡", "Upload Video & Predict 🏗️:orange[(Work in Progress)]📽️🎞️"], index = 1)
     conf = st.slider("Score threshold", 0.0, 1.0, 0.3, 0.05)
 
@@ -214,13 +222,45 @@ def main():
 
             annotated_frame1 = box_annotator.annotate(cv2_img, detections=detections)
             annotated_frame1 = label_annotator.annotate(annotated_frame1, detections=detections, labels=labels)
+
             # Display the count on the screen
             # count_text = f"Objects in Zone: {zone.current_count}"     # IMP
+
             count_text = f"Objects in Frame: {len(detections)}"
             cv2.putText(annotated_frame1, count_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2, cv2.LINE_AA)
+
+            if len(detections) > 0:
+                st.markdown(
+                    '<style>' +
+                    '.stAlert { color: white; background-color: #EC0909; }' +
+                    '</style>',
+                    unsafe_allow_html=True
+                )
+                with st.spinner('Wait for it...'):
+                    time.sleep(5)
+                st.success('Done!')
+
+                st.warning("Warning: High fire risk detected!")
+
+                audio_file_path = "./audio/warning.mp3"
+                audio_bytes = open(audio_file_path, "rb").read()
+                st.audio(audio_bytes, format="audio/mp3")
+
+                pygame.mixer.music.load(audio_file_path)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    time.sleep(0.1)
+
             # Convert the frame back to av.VideoFrame
             annotated_frame = av.VideoFrame.from_ndarray(annotated_frame1, format="bgr24")
+            # Display the annotated frame using st.image
             st.image(annotated_frame.to_ndarray(), channels="BGR")
+
+            st.write(':orange[ Info : ⤵️ ]')
+            st.json(labels1)
+            st.subheader("", divider='rainbow')
+            st.snow()
+
             # Assuming results is an instance of ultralytics.engine.results.Results
             st.write(':orange[ Info : ⤵️ ]')
             st.json(labels1)
@@ -257,10 +297,35 @@ def main():
 
             annotated_frame1 = box_annotator.annotate(cv2_img, detections=detections)
             annotated_frame1 = label_annotator.annotate(annotated_frame1, detections=detections, labels=labels)
+
+
             # Display the count on the screen
             # count_text = f"Objects in Zone: {zone.current_count}"    
             count_text = f"Objects in Frame: {len(detections)}" 
             cv2.putText(annotated_frame1, count_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
+            if len(detections) > 0:
+                st.markdown(
+                    '<style>' +
+                    '.stAlert { color: white; background-color: #EC0909; }' +
+                    '</style>',
+                    unsafe_allow_html=True
+                )
+                with st.spinner('Wait for it...'):
+                    time.sleep(5)
+                st.success('Done!')
+
+                st.warning("Warning: High fire risk detected!")
+
+                audio_file_path = "./audio/warning.mp3"
+                audio_bytes = open(audio_file_path, "rb").read()
+                st.audio(audio_bytes, format="audio/mp3")
+
+                pygame.mixer.music.load(audio_file_path)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    time.sleep(0.1)
+
             # Convert the frame back to av.VideoFrame
             annotated_frame = av.VideoFrame.from_ndarray(annotated_frame1, format="bgr24")
             # Display the annotated frame using st.image
@@ -269,7 +334,7 @@ def main():
             st.write(':orange[ Info : ⤵️ ]')
             st.json(labels1)
             st.subheader("", divider='rainbow')
-
+            st.snow()
 
     # # Upload video options
     # elif choice == "Upload Video":
@@ -364,88 +429,6 @@ def main():
     #
     #         # st.success("Video processing completed.")
 
-
-
-    # Upload video options
-    elif choice == "Upload Video":
-        st.title("🏗️Work in Progress📽️🎞️")
-
-        # Chọn video từ máy tính
-        clip = st.file_uploader("Choose file video", type=['mp4'])
-
-        if clip:
-            # Đọc nội dung của file video
-            video_content = clip.read()
-            # Chuyển đổi nội dung video thành đối tượng bytes buffer
-            video_buffer = BytesIO(video_content)
-            st.video(video_buffer)
-
-            # Lưu video tạm thời
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
-                temp_filename = temp_file.name
-                temp_file.write(video_content)
-
-                # Hiển thị tên file tạm thời
-                print(f"---->_{temp_filename}")
-
-                # Thực hiện nhận dạng đối tượng trên video
-                results = model(temp_filename, show=False, stream=True, save=False)
-
-                # Xử lý kết quả và tạo video đầu ra
-                for r in results:
-                    boxes = r.boxes.xyxy.cpu().numpy()  # Lấy thông tin về bounding boxes
-                    masks = r.masks.tensor.cpu().numpy() if r.masks is not None else None  # Lấy thông tin về masks nếu có
-                    probs = r.probs.cpu().numpy() if r.probs is not None else None  # Lấy thông tin về xác suất nếu có
-                    orig_img = r.orig_img
-                    video_path = temp_filename  # Thay đổi thành đường dẫn đến file video đầu vào
-
-                    cap = cv2.VideoCapture(video_path)
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-
-                    # Tạo video đầu ra
-                    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file_o:
-                        temp_filename1 = temp_file_o.name
-                        output_path = temp_filename1  # Thay đổi thành đường dẫn đến file video đầu ra mong muốn
-                        out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 30.0,
-                                              (int(cap.get(3)), int(cap.get(4))))
-
-                        # Chuyển đổi kết quả từ generator sang list để dễ xử lý
-                        results_list = list(results)
-
-                        # Lặp qua từng frame trong video
-                        for frame_number in range(len(results_list)):
-                            ret, frame = cap.read()
-
-                            # Lấy kết quả nhận dạng cho frame hiện tại
-                            results_for_frame = results_list[frame_number]
-                            boxes = results_for_frame.boxes.xyxy.cpu().numpy()  # Giả sử định dạng xyxy cho bounding boxes
-                            masks = results_for_frame.masks.tensor.cpu().numpy() if results_for_frame.masks is not None else None
-
-                            # Kiểm tra xem xác suất có sẵn không
-                            if results_for_frame.probs is not None:
-                                # Lấy tên class dựa trên chỉ số class
-                                class_names_dict = results_for_frame.names
-                                class_indices = results_for_frame.probs.argmax(dim=1).cpu().numpy()
-                                class_names = [class_names_dict[class_idx] for class_idx in class_indices]
-                            else:
-                                class_names = []
-
-                            # Vẽ chú thích lên frame
-                            annotated_frame = draw_annotations(frame.copy(), boxes, masks, class_names)
-
-                            # Lưu frame chú thích vào video đầu ra
-                            out.write(annotated_frame)
-
-                        cap.release()
-                        out.release()
-                        print(f"___{output_path}")
-
-                        # Hiển thị video đã xử lý
-                        with open(output_path, "rb") as video_bytes:
-                            # st.video(video_bytes.read())
-                            st.video(video_bytes.read(), format="video/mp4")
-
-                        st.success("Video processing completed.")
 
     st.subheader("",divider='rainbow')
     st.write(':orange[ Classes : ⤵️ ]')
